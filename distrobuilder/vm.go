@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	incusArch "github.com/lxc/incus/v7/shared/osarch"
 	incus "github.com/lxc/incus/v7/shared/util"
 	"golang.org/x/sys/unix"
 
@@ -17,16 +18,17 @@ import (
 )
 
 type vm struct {
-	imageFile  string
-	loopDevice string
-	rootFS     string
-	rootfsDir  string
-	bootfsDir  string
-	size       uint64
-	ctx        context.Context
+	imageFile    string
+	loopDevice   string
+	rootFS       string
+	rootfsDir    string
+	bootfsDir    string
+	size         uint64
+	ctx          context.Context
+	architecture int
 }
 
-func newVM(ctx context.Context, imageFile, rootfsDir, fs string, size uint64) (*vm, error) {
+func newVM(ctx context.Context, imageFile, rootfsDir, fs string, size uint64, architecture int) (*vm, error) {
 	if fs == "" {
 		fs = "ext4"
 	}
@@ -39,7 +41,7 @@ func newVM(ctx context.Context, imageFile, rootfsDir, fs string, size uint64) (*
 		size = 4294967296
 	}
 
-	return &vm{ctx: ctx, imageFile: imageFile, rootfsDir: rootfsDir, rootFS: fs, size: size}, nil
+	return &vm{ctx: ctx, imageFile: imageFile, rootfsDir: rootfsDir, rootFS: fs, size: size, architecture: architecture}, nil
 }
 
 func (v *vm) getLoopDev() string {
@@ -121,10 +123,21 @@ func (v *vm) createEmptyDiskImage() error {
 
 func (v *vm) createPartitions(args ...[]string) error {
 	if len(args) == 0 {
-		args = [][]string{
-			{"--zap-all"},
-			{"--new=1::+100M", "-t 1:EF00"},
-			{"--new=2::", "-t 2:8300"},
+		switch v.architecture {
+		case incusArch.ARCH_64BIT_POWERPC_LITTLE_ENDIAN:
+			// PReP boot partition (8 MiB, no filesystem) + Linux root
+			args = [][]string{
+				{"--zap-all"},
+				{"--new=1::+8M", "-t 1:4100"},
+				{"--new=2::", "-t 2:8300"},
+			}
+		default:
+			// EFI System Partition (100 MiB, vfat) + Linux root
+			args = [][]string{
+				{"--zap-all"},
+				{"--new=1::+100M", "-t 1:EF00"},
+				{"--new=2::", "-t 2:8300"},
+			}
 		}
 	}
 
@@ -210,7 +223,7 @@ func (v *vm) mountImage() error {
 	if err != nil {
 		return err
 	} else if num != 3 {
-		return fmt.Errorf("Failed to list block devices")
+		return fmt.Errorf("Expected 3 block devices (loop + 2 partitions), got %d", num)
 	}
 
 	if !incus.PathExists(v.getUEFIDevFile()) {
@@ -315,6 +328,11 @@ func (v *vm) createUEFIFS() error {
 		return errors.New("Disk image not mounted")
 	}
 
+	// ppc64le uses a raw PReP partition instead of a vfat ESP
+	if v.architecture == incusArch.ARCH_64BIT_POWERPC_LITTLE_ENDIAN {
+		return nil
+	}
+
 	return shared.RunCommand(v.ctx, nil, nil, "mkfs.vfat", "-F", "32", "-n", "UEFI", v.getUEFIDevFile())
 }
 
@@ -336,6 +354,11 @@ func (v *vm) mountRootPartition() error {
 func (v *vm) mountUEFIPartition() error {
 	if v.loopDevice == "" {
 		return errors.New("Disk image not mounted")
+	}
+
+	// ppc64le uses a raw PReP partition, no vfat filesystem to mount
+	if v.architecture == incusArch.ARCH_64BIT_POWERPC_LITTLE_ENDIAN {
+		return nil
 	}
 
 	v.bootfsDir = filepath.Join(v.rootfsDir, "boot", "efi")
