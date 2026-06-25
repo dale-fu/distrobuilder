@@ -388,10 +388,13 @@ func (c *cmdIncus) run(cmd *cobra.Command, args []string, overlayDir string) err
 			return fmt.Errorf("Failed to find rootfs device UUID: %w", err)
 		}
 
+		loopEnv := fmt.Sprintf("%s=%s", shared.EnvLoopDevice, vm.getLoopDev())
+
 		c.global.ctx = context.WithValue(c.global.ctx, shared.ContextKeyEnviron,
 			[]string{
 				fmt.Sprintf("%s=%s", shared.EnvRootUUID, rootUUID),
 				fmt.Sprintf("%s=%s", shared.EnvRootPARTUUID, partUUID),
+				loopEnv,
 			})
 		// We cannot use Incus' rsync package as that uses the --delete flag which
 		// causes an issue due to the boot/efi directory being present.

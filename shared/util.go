@@ -25,6 +25,7 @@ const (
 	ContextKeyStderr  = ContextKey("stderr")
 	EnvRootUUID       = "DISTROBUILDER_ROOT_UUID"
 	EnvRootPARTUUID   = "DISTROBUILDER_ROOT_PARTUUID"
+	EnvLoopDevice     = "DISTROBUILDER_LOOP_DEVICE"
 )
 
 // EnvVariable represents a environment variable.
