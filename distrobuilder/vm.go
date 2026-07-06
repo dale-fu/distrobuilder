@@ -131,6 +131,13 @@ func (v *vm) createPartitions(args ...[]string) error {
 				{"--new=1::+8M", "-t 1:4100"},
 				{"--new=2::", "-t 2:8300"},
 			}
+		case incusArch.ARCH_64BIT_S390_BIG_ENDIAN:
+			// Boot partition (500 MiB, ext4) + Linux root
+			args = [][]string{
+				{"--zap-all"},
+				{"--new=1::+500M", "-t 1:8300"},
+				{"--new=2::", "-t 2:8300"},
+			}
 		default:
 			// EFI System Partition (100 MiB, vfat) + Linux root
 			args = [][]string{
@@ -333,6 +340,11 @@ func (v *vm) createUEFIFS() error {
 		return nil
 	}
 
+	// s390x uses an ext4 boot partition instead of a vfat ESP
+	if v.architecture == incusArch.ARCH_64BIT_S390_BIG_ENDIAN {
+		return shared.RunCommand(v.ctx, nil, nil, "mkfs.ext4", "-F", "-L", "boot", v.getUEFIDevFile())
+	}
+
 	return shared.RunCommand(v.ctx, nil, nil, "mkfs.vfat", "-F", "32", "-n", "UEFI", v.getUEFIDevFile())
 }
 
@@ -359,6 +371,18 @@ func (v *vm) mountUEFIPartition() error {
 	// ppc64le uses a raw PReP partition, no vfat filesystem to mount
 	if v.architecture == incusArch.ARCH_64BIT_POWERPC_LITTLE_ENDIAN {
 		return nil
+	}
+
+	// s390x uses an ext4 boot partition mounted at /boot
+	if v.architecture == incusArch.ARCH_64BIT_S390_BIG_ENDIAN {
+		v.bootfsDir = filepath.Join(v.rootfsDir, "boot")
+
+		err := os.MkdirAll(v.bootfsDir, 0o755)
+		if err != nil {
+			return fmt.Errorf("Failed to create directory %q: %w", v.bootfsDir, err)
+		}
+
+		return shared.RunCommand(v.ctx, nil, nil, "mount", "-t", "ext4", v.getUEFIDevFile(), v.bootfsDir, "-o", "discard")
 	}
 
 	v.bootfsDir = filepath.Join(v.rootfsDir, "boot", "efi")
@@ -388,3 +412,4 @@ func (v *vm) checkMountpoint(mountpoint string) error {
 
 	return nil
 }
+

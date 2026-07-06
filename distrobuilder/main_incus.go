@@ -418,9 +418,7 @@ func (c *cmdIncus) run(cmd *cobra.Command, args []string, overlayDir string) err
 			},
 		}
 
-		// Bind-mount the UEFI/PReP partition into the chroot.
-		// For ppc64le this is a raw PReP partition (no filesystem), for
-		// x86_64/aarch64 it is a vfat ESP that also gets mounted at /boot/efi.
+		
 		if vm.getUEFIDevFile() != "" {
 			mounts = append(mounts, shared.ChrootMount{
 				Source: vm.getUEFIDevFile(),
@@ -429,7 +427,16 @@ func (c *cmdIncus) run(cmd *cobra.Command, args []string, overlayDir string) err
 			})
 		}
 
-		if vm.architecture != incusArch.ARCH_64BIT_POWERPC_LITTLE_ENDIAN && vm.getUEFIDevFile() != "" {
+		if vm.architecture == incusArch.ARCH_64BIT_S390_BIG_ENDIAN && vm.getUEFIDevFile() != "" {
+			mounts = append(mounts, shared.ChrootMount{
+				Source: vm.getUEFIDevFile(),
+				Target: "/boot",
+				FSType: "ext4",
+				Flags:  0,
+				Data:   "",
+				IsDir:  true,
+			})
+		} else if vm.architecture != incusArch.ARCH_64BIT_POWERPC_LITTLE_ENDIAN && vm.getUEFIDevFile() != "" {
 			mounts = append(mounts, shared.ChrootMount{
 				Source: vm.getUEFIDevFile(),
 				Target: "/boot/efi",
@@ -602,3 +609,4 @@ func (c *cmdIncus) checkVMDependencies() error {
 
 	return nil
 }
+
