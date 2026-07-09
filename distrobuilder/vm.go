@@ -412,4 +412,3 @@ func (v *vm) checkMountpoint(mountpoint string) error {
 
 	return nil
 }
-

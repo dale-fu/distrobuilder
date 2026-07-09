@@ -418,7 +418,7 @@ func (c *cmdIncus) run(cmd *cobra.Command, args []string, overlayDir string) err
 			},
 		}
 
-		
+		// Bind-mount the boot partition device into the chroot (if present).
 		if vm.getUEFIDevFile() != "" {
 			mounts = append(mounts, shared.ChrootMount{
 				Source: vm.getUEFIDevFile(),
@@ -598,7 +598,7 @@ func (c *cmdIncus) run(cmd *cobra.Command, args []string, overlayDir string) err
 }
 
 func (c *cmdIncus) checkVMDependencies() error {
-	dependencies := []string{"btrfs", "mkfs.ext4", "mkfs.vfat", "qemu-img", "rsync", "sgdisk"}
+	dependencies := []string{"btrfs", "mkfs.ext4", "qemu-img", "rsync", "sgdisk"}
 
 	for _, dep := range dependencies {
 		_, err := exec.LookPath(dep)
@@ -609,4 +609,3 @@ func (c *cmdIncus) checkVMDependencies() error {
 
 	return nil
 }
-

@@ -78,6 +78,7 @@ func TestLsblkOutput(t *testing.T) {
 		{"DiskEmpty", [][]string{{"--zap-all"}}, 1},
 		{"UEFI", nil, 3},
 		{"PReP", [][]string{{"--zap-all"}, {"--new=1::+8M", "-t 1:4100"}, {"--new=2::", "-t 2:8300"}}, 3},
+		{"S390x", [][]string{{"--zap-all"}, {"--new=1::+50M", "-t 1:8300"}, {"--new=2::", "-t 2:8300"}}, 3},
 		{"MBR", [][]string{{"--new=1::"}, {"--gpttombr"}}, 2},
 	}
 
