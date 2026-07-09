@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	incusArch "github.com/lxc/incus/v7/shared/osarch"
+
 	"github.com/lxc/distrobuilder/v3/image"
 	"github.com/lxc/distrobuilder/v3/shared"
 )
@@ -28,10 +30,6 @@ func (g *fstab) RunIncus(img *image.IncusImage, target shared.DefinitionTargetIn
 
 	defer f.Close()
 
-	content := `LABEL=rootfs  /         %s  %s  0 0
-LABEL=UEFI    /boot/efi vfat  defaults  0 0
-`
-
 	fs := target.VM.Filesystem
 
 	if fs == "" {
@@ -44,7 +42,23 @@ LABEL=UEFI    /boot/efi vfat  defaults  0 0
 		options = fmt.Sprintf("%s,subvol=@", options)
 	}
 
-	_, err = fmt.Fprintf(f, content, fs, options)
+	// Determine the boot partition fstab entry based on architecture.
+	// s390x uses an ext4 /boot partition; ppc64le uses a raw PReP partition
+	// (no filesystem, no fstab entry); all others use a vfat /boot/efi ESP.
+	archID, _ := incusArch.ArchitectureID(g.def.Image.Architecture)
+
+	var bootEntry string
+
+	switch archID {
+	case incusArch.ARCH_64BIT_S390_BIG_ENDIAN:
+		bootEntry = "LABEL=boot    /boot     ext4  defaults  0 2\n"
+	case incusArch.ARCH_64BIT_POWERPC_LITTLE_ENDIAN:
+		// PReP partition has no filesystem; no fstab entry needed.
+	default:
+		bootEntry = "LABEL=UEFI    /boot/efi vfat  defaults  0 0\n"
+	}
+
+	_, err = fmt.Fprintf(f, "LABEL=rootfs  /         %s  %s  0 0\n%s", fs, options, bootEntry)
 	if err != nil {
 		return fmt.Errorf("Failed to write string to file %q: %w", filepath.Join(g.sourceDir, "etc/fstab"), err)
 	}

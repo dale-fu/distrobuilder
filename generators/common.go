@@ -11,6 +11,7 @@ type common struct {
 	cacheDir  string
 	sourceDir string
 	defFile   shared.DefinitionFile
+	def       shared.Definition
 }
 
 func (g *common) init(logger *logrus.Logger, cacheDir string, sourceDir string, defFile shared.DefinitionFile, def shared.Definition) {
@@ -18,6 +19,7 @@ func (g *common) init(logger *logrus.Logger, cacheDir string, sourceDir string, 
 	g.cacheDir = cacheDir
 	g.sourceDir = sourceDir
 	g.defFile = defFile
+	g.def = def
 
 	render := func(val string) string {
 		if !defFile.Pongo {
