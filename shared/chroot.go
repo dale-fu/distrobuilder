@@ -1,7 +1,6 @@
 package shared
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -193,35 +192,7 @@ func SetupChroot(rootfs string, definition Definition, m []ChrootMount) (func() 
 		{"none", "/tmp", "tmpfs", 0, "", true},
 		{"none", "/dev", "tmpfs", 0, "", true},
 		{"none", "/dev/shm", "tmpfs", 0, "", true},
-	}
-
-	// Handle resolv.conf - ensure DNS resolution works in chroot.
-	// Prefer /run/systemd/resolve/resolv.conf which contains real upstream IPs
-	// rather than /etc/resolv.conf which may point to 127.0.0.53 (systemd-resolved
-	// stub) that is unreachable inside the chroot.
-	hostResolvConf := "/run/systemd/resolve/resolv.conf"
-	if !incus.PathExists(hostResolvConf) {
-		hostResolvConf = "/etc/resolv.conf"
-	}
-	
-	targetResolvConf := filepath.Join(rootfs, "etc", "resolv.conf")
-	
-	if incus.PathExists(hostResolvConf) {
-		// Remove immutable flag if already set on target
-		_ = RunCommand(context.Background(), nil, nil, "chattr", "-i", targetResolvConf)
-		
-		// Remove any existing symlink or file
-		_ = os.Remove(targetResolvConf)
-		
-		// Read and copy host resolv.conf with proper permissions
-		resolvConfContent, err := os.ReadFile(hostResolvConf)
-		if err == nil && len(resolvConfContent) > 0 {
-			err = os.WriteFile(targetResolvConf, resolvConfContent, 0o644)
-			if err == nil {
-				// Ensure it's not immutable
-				_ = RunCommand(context.Background(), nil, nil, "chattr", "-i", targetResolvConf)
-			}
-		}
+		{"/etc/resolv.conf", "/etc/resolv.conf", "", unix.MS_BIND, "", false},
 	}
 
 	// Keep a reference to the host rootfs and cwd
